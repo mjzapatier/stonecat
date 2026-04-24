@@ -189,6 +189,12 @@
         <div class="rad" onclick="pr(this)">A veces</div>
       </div>
     </div>
+    <div class="fg">
+      <label>Foto de tu gato (opcional)</label>
+      <input type="file" id="f-cat-photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+      <small id="f-cat-photo-help" style="color:#999;font-size:11px;display:block;margin-top:3px">JPG o PNG · máximo 5MB</small>
+      <img id="f-cat-photo-preview" alt="Vista previa de la foto del gato" style="display:none;width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:10px;border:1px solid #E8ECF3">
+    </div>
     <button class="b b1" onclick="v2()">Siguiente →</button>
   </div>
 
@@ -294,6 +300,31 @@ const P={
   primeriza:{n:"Karen Primeriza 🌱",d:"Recién arranca la aventura gatuna. Todo es nuevo, todo es amor."}
 };
 let R=[],U={},rOk=false;
+const MAX_CAT_PHOTO_SIZE = 5 * 1024 * 1024; // 5MB
+let catPhotoPreviewUrl = '';
+
+function validarFotoGato(file){
+  if(!file) return true;
+  const tiposPermitidos = ['image/jpeg', 'image/png'];
+  if(!tiposPermitidos.includes(file.type)){
+    alert('Subí una imagen JPG o PNG 🐱');
+    return false;
+  }
+  if(file.size > MAX_CAT_PHOTO_SIZE){
+    alert('La foto supera los 5MB. Elegí una más liviana 🐾');
+    return false;
+  }
+  return true;
+}
+
+function convertirImagenABase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+    reader.readAsDataURL(file);
+  });
+}
 
 function go(n){
   // Ocultar portada
@@ -319,6 +350,15 @@ let webhookSent = false;
 async function enviarDatos(perfil) {
   if (webhookSent) return; // evitar duplicados
   webhookSent = true;
+
+  let fotoGatoBase64 = '';
+  if (U.catPhotoFile) {
+    try {
+      fotoGatoBase64 = await convertirImagenABase64(U.catPhotoFile);
+    } catch (err) {
+      console.error('❌ Error convirtiendo imagen a Base64:', err);
+    }
+  }
   
   const payload = {
     // Datos del tutor (mismos que Tally)
@@ -339,6 +379,10 @@ async function enviarDatos(perfil) {
     fuente: 'quiz-academia-stonecat',
     fecha: new Date().toISOString()
   };
+
+  if (fotoGatoBase64) {
+    payload.foto_gato = fotoGatoBase64;
+  }
 
   try {
     await fetch(WEBHOOK_URL, {
@@ -378,8 +422,12 @@ function pr(el){
 function v2(){
   let cn=document.getElementById('f-cn').value.trim();
   let cb=document.getElementById('f-cb').value;
+  const catPhotoInput = document.getElementById('f-cat-photo');
+  const catPhotoFile = catPhotoInput.files && catPhotoInput.files[0] ? catPhotoInput.files[0] : null;
   if(!cn||!cb||!rOk){alert('¡Completá todos los campos! 🐾');return;}
+  if(catPhotoFile && !validarFotoGato(catPhotoFile)) return;
   U.cn=cn; U.cb=cb;
+  U.catPhotoFile = catPhotoFile || null;
   document.getElementById('cd').textContent=cn;
   go(3);
 }
@@ -437,8 +485,52 @@ function rst(){
   document.querySelectorAll('.o,.rad').forEach(o=>o.classList.remove('sel'));
   document.querySelectorAll('input').forEach(i=>i.value='');
   document.getElementById('f-c').value='';
+  const photoPreview = document.getElementById('f-cat-photo-preview');
+  photoPreview.style.display = 'none';
+  photoPreview.removeAttribute('src');
+  document.getElementById('f-cat-photo-help').textContent = 'JPG o PNG · máximo 5MB';
+  if(catPhotoPreviewUrl){
+    URL.revokeObjectURL(catPhotoPreviewUrl);
+    catPhotoPreviewUrl = '';
+  }
   go(0);
 }
+
+document.getElementById('f-cat-photo').addEventListener('change', function(e){
+  const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+  const photoPreview = document.getElementById('f-cat-photo-preview');
+  const photoHelp = document.getElementById('f-cat-photo-help');
+
+  if(!file){
+    photoPreview.style.display = 'none';
+    photoPreview.removeAttribute('src');
+    photoHelp.textContent = 'JPG o PNG · máximo 5MB';
+    U.catPhotoFile = null;
+    if(catPhotoPreviewUrl){
+      URL.revokeObjectURL(catPhotoPreviewUrl);
+      catPhotoPreviewUrl = '';
+    }
+    return;
+  }
+
+  if(!validarFotoGato(file)){
+    e.target.value = '';
+    photoPreview.style.display = 'none';
+    photoPreview.removeAttribute('src');
+    photoHelp.textContent = 'JPG o PNG · máximo 5MB';
+    U.catPhotoFile = null;
+    return;
+  }
+
+  if(catPhotoPreviewUrl){
+    URL.revokeObjectURL(catPhotoPreviewUrl);
+  }
+  catPhotoPreviewUrl = URL.createObjectURL(file);
+  photoPreview.src = catPhotoPreviewUrl;
+  photoPreview.style.display = 'block';
+  photoHelp.textContent = `Archivo listo: ${file.name}`;
+  U.catPhotoFile = file;
+});
 </script>
 </body>
 </html>
