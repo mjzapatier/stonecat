@@ -381,6 +381,10 @@ async function enviarDatos(perfil) {
     fecha: new Date().toISOString()
   };
 
+  if (fotoGatoBase64) {
+    payload.foto_gato = fotoGatoBase64;
+  }
+
   try {
     await fetch(WEBHOOK_URL, {
       method: 'POST',
